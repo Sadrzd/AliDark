@@ -32,7 +32,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public final class XMDarkHook implements IXposedHookLoadPackage {
 
     private static final String TAG = "[XMDark] ";
-    private static final String SELF_PACKAGE = "com.xmdark.module";
 
     private static final String[] TARGET_PACKAGES = {
             "com.taobao.idlefish",   // 闲鱼
@@ -41,10 +40,6 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
-        if (SELF_PACKAGE.equals(lpparam.packageName)) {
-            hookSelfStatus(lpparam);
-            return;
-        }
         if (!isTarget(lpparam.packageName)) return;
 
         XposedBridge.log(TAG + "attached to " + lpparam.packageName);
@@ -60,21 +55,6 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
             if (target.equals(packageName)) return true;
         }
         return false;
-    }
-
-    /** Flips the module's own wire flag so the launcher can show 已激活. */
-    private static void hookSelfStatus(XC_LoadPackage.LoadPackageParam lpparam) {
-        try {
-            XposedHelpers.findAndHookMethod(SELF_PACKAGE + ".MainActivity",
-                    lpparam.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            ModuleStatus.active = true;
-                        }
-                    });
-        } catch (Throwable t) {
-            XposedBridge.log(TAG + "self status hook failed: " + t);
-        }
     }
 
     // ------------------------------------------------------------------ Views

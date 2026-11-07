@@ -29,13 +29,9 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView status = new TextView(this);
-        if (ModuleStatus.active) {
-            status.setText("模块状态：已激活");
-            status.setTextColor(Color.parseColor("#2E7D32"));
-        } else {
-            status.setText("模块状态：未检测到激活\n请在 LSPosed 中启用本模块后重启本应用查看。");
-            status.setTextColor(Color.parseColor("#C62828"));
-        }
+        status.setText("是否生效请以 LSPosed 管理器为准：\n只要在本模块的作用域里勾选了"
+                + "「闲鱼」和「美团」即为启用。本应用无法自动检测模块注入状态。");
+        status.setTextColor(Color.parseColor("#616161"));
         status.setTextSize(16);
         status.setPadding(0, pad, 0, 0);
         root.addView(status);

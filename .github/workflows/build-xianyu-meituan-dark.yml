@@ -6,7 +6,12 @@ on:
     paths:
       - 'XianyuMeituanDark/**'
       - '.github/workflows/build-xianyu-meituan-dark.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,13 +27,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK
+      - name: Build Release APK
         working-directory: XianyuMeituanDark
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Upload Built APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: XianyuMeituanDark-APK
-          path: XianyuMeituanDark/app/build/outputs/apk/**/*.apk
+          name: XianyuMeituanDark-Release-APK
+          path: XianyuMeituanDark/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: XianyuMeituanDark/app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
