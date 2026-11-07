@@ -1,0 +1,37 @@
+name: Build XianyuMeituanDark
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'XianyuMeituanDark/**'
+      - '.github/workflows/build-xianyu-meituan-dark.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        working-directory: XianyuMeituanDark
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Built APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: XianyuMeituanDark-APK
+          path: XianyuMeituanDark/app/build/outputs/apk/**/*.apk

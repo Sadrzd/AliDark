@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- dark disc -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M24,2 A22,22 0 1,0 24.01,2 Z" />
+    <!-- crescent moon -->
+    <path
+        android:fillColor="#FCD34D"
+        android:fillType="evenOdd"
+        android:pathData="M31,11 A13,13 0 1,0 31,37 A10.5,10.5 0 1,1 31,11 Z" />
+</vector>

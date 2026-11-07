@@ -1,0 +1,6 @@
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.taobao.idlefish</item>
+        <item>com.sankuai.meituan</item>
+    </string-array>
+</resources>

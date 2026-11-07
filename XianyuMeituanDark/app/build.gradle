@@ -1,0 +1,26 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.xmdark.module'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.xmdark.module'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    // LSPosed exposes the legacy Xposed API. compileOnly keeps it out of the APK.
+    compileOnly 'de.robv.android.xposed:api:82'
+}
