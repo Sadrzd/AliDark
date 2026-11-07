@@ -1,0 +1,9 @@
+<resources>
+    <!-- LSPosed reads this as the recommended module scope. -->
+    <string-array name="xposed_scope">
+        <item>com.sankuai.meituan</item>
+        <item>com.eg.android.AlipayGphone</item>
+        <item>com.taobao.idlefish</item>
+        <item>com.taobao.taobao</item>
+    </string-array>
+</resources>
