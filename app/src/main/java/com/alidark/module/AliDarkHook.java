@@ -13,6 +13,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.PopupWindow;
 
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
+
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -186,7 +190,7 @@ public final class AliDarkHook implements IXposedHookLoadPackage {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
                 try {
-                    applyToWebView((WebView) param.thisObject);
+                    applyToWebViewOnce((WebView) param.thisObject);
                 } catch (Throwable t) {
                     XposedBridge.log(TAG + "WebView apply failed: " + t);
                 }
@@ -208,7 +212,9 @@ public final class AliDarkHook implements IXposedHookLoadPackage {
         if (view == null) return;
         try {
             if (view instanceof WebView) {
-                applyToWebView((WebView) view);
+                // Configuration changed (e.g. night mode toggled): re-evaluate
+                // even WebViews that were already configured.
+                reapplyToWebView((WebView) view);
             }
             if (view instanceof ViewGroup) {
                 ViewGroup group = (ViewGroup) view;
@@ -228,27 +234,49 @@ public final class AliDarkHook implements IXposedHookLoadPackage {
         return mask == Configuration.UI_MODE_NIGHT_YES;
     }
 
-    private static void applyToWebView(WebView webView) {
+    /**
+     * WebViews already configured in this process. Settings are applied at
+     * most once per instance: calling WebView provider APIs repeatedly (in
+     * particular after content has loaded) can break page rendering.
+     */
+    private static final Set<WebView> APPLIED_WEBVIEWS = Collections.synchronizedSet(
+            Collections.newSetFromMap(new WeakHashMap<WebView, Boolean>()));
+
+    private static void applyToWebViewOnce(WebView webView) {
         if (webView == null || Build.VERSION.SDK_INT < 29) return;
+        if (APPLIED_WEBVIEWS.contains(webView)) return;
+        if (applyToWebView(webView)) {
+            APPLIED_WEBVIEWS.add(webView);
+        }
+    }
+
+    private static void reapplyToWebView(WebView webView) {
+        if (webView == null) return;
+        APPLIED_WEBVIEWS.remove(webView);
+        applyToWebViewOnce(webView);
+    }
+
+    private static boolean applyToWebView(WebView webView) {
+        if (webView == null || Build.VERSION.SDK_INT < 29) return true;
         try {
             WebSettings settings = webView.getSettings();
-            if (settings == null) return;
+            if (settings == null) return false;
+
+            // Only touch the WebView while the system is in night mode. In
+            // light mode the default state already renders normally, and
+            // every provider call is one more chance to break the page.
+            if (!isNightMode(webView.getContext())) return true;
 
             // FORCE_DARK_AUTO depends on the host app theme opting in, which
-            // many target apps disabled. Gate FORCE_DARK_ON/OFF on the system
-            // night mode instead so darkening actually happens, but only while
-            // the system is dark (never an always-dark override).
-            boolean night = isNightMode(webView.getContext());
-            settings.setForceDark(night ? WebSettings.FORCE_DARK_ON
-                                        : WebSettings.FORCE_DARK_OFF);
-
-            // Android 13+ replaced the force-dark strategy for WebView with
-            // an explicit algorithmic-darkening switch.
-            if (Build.VERSION.SDK_INT >= 33) {
-                settings.setAlgorithmicDarkeningAllowed(night);
-            }
+            // the target apps disabled, so darken explicitly. FORCE_DARK_ON
+            // is used on all API levels (deprecated but functional on 33+);
+            // it is deliberately NOT combined with setAlgorithmicDarkeningAllowed,
+            // which is the mutually exclusive replacement mechanism.
+            settings.setForceDark(WebSettings.FORCE_DARK_ON);
+            return true;
         } catch (Throwable t) {
             XposedBridge.log(TAG + "WebView settings failed: " + t);
+            return false;
         }
     }
 }
