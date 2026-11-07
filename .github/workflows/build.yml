@@ -19,15 +19,10 @@ jobs:
           ls -la
           
           ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "未找到 .zip 压缩包，检查是否已解压..."
-          else
-            echo "找到压缩包: $ZIP_FILE，正在解压..."
+          if [ -n "$ZIP_FILE" ]; then
+            echo "解压源码包: $ZIP_FILE"
             unzip -q -o "$ZIP_FILE"
           fi
-          
-          echo "=== 解压后的目录层级 ==="
-          find . -maxdepth 3 -not -path '*/.*'
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -40,25 +35,25 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           SETTINGS_PATH=$(find . -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
-          
-          if [ -z "$SETTINGS_PATH" ]; then
-            echo "❌ 错误: 未能在压缩包或仓库中找到 settings.gradle！"
-            exit 1
-          fi
-          
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
-          echo "✅ 找到 Android 工程根目录: $PROJECT_DIR"
+          echo "✅ 工程目录: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
-          echo "🔧 自动修复 build.gradle 中的 VERSION_8 -> VERSION_1_8 语法问题..."
+          echo "🔧 自动修复 build.gradle 中的 VERSION_8"
           find . -name "build.gradle" -exec sed -i 's/VERSION_8/VERSION_1_8/g' {} +
           
-          echo "🔧 统一配置兼容性最好的 Gradle 8.5 Wrapper..."
+          echo "=== 根目录 build.gradle 内容 ==="
+          cat build.gradle 2>/dev/null || true
+          
+          echo "=== app/build.gradle 内容 ==="
+          cat app/build.gradle 2>/dev/null || true
+          
+          echo "🔧 生成 Gradle 8.5 Wrapper..."
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
           
           echo "🚀 开始编译 APK..."
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload Built APK
         uses: actions/upload-artifact@v4
