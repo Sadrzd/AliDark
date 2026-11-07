@@ -42,18 +42,12 @@ jobs:
           echo "🔧 自动修复 build.gradle 中的 VERSION_8"
           find . -name "build.gradle" -exec sed -i 's/VERSION_8/VERSION_1_8/g' {} +
           
-          echo "=== 根目录 build.gradle 内容 ==="
-          cat build.gradle 2>/dev/null || true
-          
-          echo "=== app/build.gradle 内容 ==="
-          cat app/build.gradle 2>/dev/null || true
-          
-          echo "🔧 生成 Gradle 8.5 Wrapper..."
-          gradle wrapper --gradle-version 8.5
+          echo "🔧 升级到匹配的 Gradle 8.9..."
+          gradle wrapper --gradle-version 8.9
           chmod +x gradlew
           
           echo "🚀 开始编译 APK..."
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload Built APK
         uses: actions/upload-artifact@v4
