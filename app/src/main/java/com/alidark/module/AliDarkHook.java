@@ -267,11 +267,20 @@ public final class AliDarkHook implements IXposedHookLoadPackage {
             // every provider call is one more chance to break the page.
             if (!isNightMode(webView.getContext())) return true;
 
+            if (Build.VERSION.SDK_INT >= 33) {
+                // Algorithmic darkening is the official mechanism since
+                // Android 13 (setForceDark is deprecated and may stop working
+                // on Android 16 / OneUI 8.5). Fall back to force dark if the
+                // WebView provider rejects it.
+                try {
+                    settings.setAlgorithmicDarkeningAllowed(true);
+                    return true;
+                } catch (Throwable t) {
+                    XposedBridge.log(TAG + "algorithmic darkening failed: " + t);
+                }
+            }
             // FORCE_DARK_AUTO depends on the host app theme opting in, which
-            // the target apps disabled, so darken explicitly. FORCE_DARK_ON
-            // is used on all API levels (deprecated but functional on 33+);
-            // it is deliberately NOT combined with setAlgorithmicDarkeningAllowed,
-            // which is the mutually exclusive replacement mechanism.
+            // the target apps disabled, so darken explicitly.
             settings.setForceDark(WebSettings.FORCE_DARK_ON);
             return true;
         } catch (Throwable t) {
