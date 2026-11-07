@@ -35,7 +35,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Locate Project and Build APK
+      - name: Fix Code and Build APK
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
@@ -50,12 +50,13 @@ jobs:
           echo "✅ 找到 Android 工程根目录: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
-          if [ ! -f "gradlew" ]; then
-            echo "未找到 gradlew，正在初始化 gradle wrapper..."
-            gradle wrapper
-          fi
+          echo "🔧 自动修复 build.gradle 中的 VERSION_8 -> VERSION_1_8 语法问题..."
+          find . -name "build.gradle" -exec sed -i 's/VERSION_8/VERSION_1_8/g' {} +
           
+          echo "🔧 统一配置兼容性最好的 Gradle 8.5 Wrapper..."
+          gradle wrapper --gradle-version 8.5
           chmod +x gradlew
+          
           echo "🚀 开始编译 APK..."
           ./gradlew assembleDebug --stacktrace
 
