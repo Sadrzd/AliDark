@@ -60,7 +60,19 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
     // ------------------------------------------------------------------ Views
 
     private static void hookActivity(XC_LoadPackage.LoadPackageParam lpparam) {
-        XC_MethodHook applyForce = new XC_MethodHook() {
+        // Apply BEFORE the app inflates its content view. Force Dark is
+        // resolved during view inflation, so applying the flag only after
+        // onCreate() is too late for existing views.
+        XC_MethodHook applyEarly = new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param) {
+                Activity activity = (Activity) param.thisObject;
+                Window window = activity.getWindow();
+                if (window != null) applyForceDark(window.getDecorView());
+            }
+        };
+        // Re-apply after resume for views added later in the lifecycle.
+        XC_MethodHook applyLate = new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
                 Activity activity = (Activity) param.thisObject;
@@ -68,6 +80,8 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
                 if (window != null) applyForceDark(window.getDecorView());
             }
         };
+        // Follow system dark/light toggles even when the app suppresses
+        // recreation with configChanges.
         XC_MethodHook onConfigChanged = new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
@@ -79,9 +93,10 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
             }
         };
         try {
-            XposedHelpers.findAndHookMethod(Activity.class, "onCreate", Bundle.class, applyForce);
-            XposedHelpers.findAndHookMethod(Activity.class, "onResume", applyForce);
-            XposedHelpers.findAndHookMethod(Activity.class, "onPostResume", applyForce);
+            XposedHelpers.findAndHookMethod(Activity.class, "onCreate", Bundle.class, applyEarly);
+            XposedBridge.hookAllMethods(Activity.class, "setContentView", applyEarly);
+            XposedHelpers.findAndHookMethod(Activity.class, "onResume", applyLate);
+            XposedHelpers.findAndHookMethod(Activity.class, "onPostResume", applyLate);
             XposedHelpers.findAndHookMethod(Activity.class, "onConfigurationChanged",
                     Configuration.class, onConfigChanged);
         } catch (Throwable t) {
