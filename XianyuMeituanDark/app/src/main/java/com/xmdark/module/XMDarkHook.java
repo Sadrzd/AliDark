@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Paint;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -11,7 +15,9 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.ImageView;
 import android.widget.PopupWindow;
+import android.widget.Toast;
 
 import java.util.Collections;
 import java.util.Set;
@@ -25,9 +31,10 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
  * XMDark: makes Xianyu (闲鱼) and Meituan (美团) follow the system dark/light
- * mode. Native View trees are handled with Android's Force Dark algorithm and
- * WebView content with algorithmic darkening, both gated on the system night
- * mode so the apps stay in sync with a Samsung OneUI dark-mode toggle.
+ * mode. Because these apps hard-code light colors and do not adapt to dark
+ * mode, we apply a color-invert layer on the window (gated on system night
+ * mode) and double-invert ImageView so photos stay recognisable. WebView/H5
+ * content uses algorithmic darkening instead.
  */
 public final class XMDarkHook implements IXposedHookLoadPackage {
 
@@ -68,7 +75,7 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
             protected void beforeHookedMethod(MethodHookParam param) {
                 Activity activity = (Activity) param.thisObject;
                 Window window = activity.getWindow();
-                if (window != null) applyForceDark(window.getDecorView());
+                if (window != null) applyNight(window.getDecorView());
             }
         };
         // Re-apply after resume for views added later in the lifecycle.
@@ -77,7 +84,8 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
             protected void afterHookedMethod(MethodHookParam param) {
                 Activity activity = (Activity) param.thisObject;
                 Window window = activity.getWindow();
-                if (window != null) applyForceDark(window.getDecorView());
+                if (window != null) applyNight(window.getDecorView());
+                showOnce(activity);
             }
         };
         // Follow system dark/light toggles even when the app suppresses
@@ -88,7 +96,7 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
                 Activity activity = (Activity) param.thisObject;
                 Window window = activity.getWindow();
                 if (window == null) return;
-                applyForceDark(window.getDecorView());
+                applyNight(window.getDecorView());
                 reapplyWebViewsInTree(window.getDecorView());
             }
         };
@@ -111,7 +119,7 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
                 protected void afterHookedMethod(MethodHookParam param) {
                     Dialog dialog = (Dialog) param.thisObject;
                     Window window = dialog.getWindow();
-                    if (window != null) applyForceDark(window.getDecorView());
+                    if (window != null) applyNight(window.getDecorView());
                 }
             });
         } catch (Throwable t) {
@@ -125,7 +133,7 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
             protected void afterHookedMethod(MethodHookParam param) {
                 PopupWindow popup = (PopupWindow) param.thisObject;
                 View content = popup.getContentView();
-                if (content != null) applyForceDark(content);
+                if (content != null) applyNight(content);
             }
         };
         try {
@@ -136,22 +144,62 @@ public final class XMDarkHook implements IXposedHookLoadPackage {
         }
     }
 
-    /**
-     * Marks an inflated tree eligible for Force Dark. The flag normally
-     * inherits down on inflation, but already-inflated light trees need an
-     * explicit recursive pass to take effect.
-     */
-    private static void applyForceDark(View root) {
-        if (root == null || Build.VERSION.SDK_INT < 29) return;
+    private static final ColorFilter INVERT_FILTER =
+            new ColorMatrixColorFilter(new ColorMatrix(new float[]{
+                    -1f, 0f, 0f, 0f, 255f,
+                    0f, -1f, 0f, 0f, 255f,
+                    0f, 0f, -1f, 0f, 255f,
+                    0f, 0f, 0f, 1f, 0f
+            }));
+
+    private static final Paint INVERT_PAINT = createInvertPaint();
+
+    private static Paint createInvertPaint() {
+        Paint paint = new Paint();
+        paint.setColorFilter(INVERT_FILTER);
+        return paint;
+    }
+
+    private static boolean sToasted = false;
+
+    private static void showOnce(Activity activity) {
+        if (sToasted) return;
+        sToasted = true;
         try {
-            root.setForceDarkAllowed(true);
-        } catch (Throwable ignored) {
-            return;
+            Toast.makeText(activity, "XMDark 已生效", Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "toast failed: " + t);
         }
-        if (root instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) root;
+    }
+
+    /**
+     * Applies (or clears) a color-invert layer on the given root view to force
+     * dark rendering. ImageView children are double-inverted so photos stay
+     * close to their original colours instead of turning into negatives.
+     */
+    private static void applyNight(View root) {
+        if (root == null) return;
+        boolean night = isNightMode(root.getContext());
+        try {
+            root.setLayerType(night ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE,
+                    night ? INVERT_PAINT : null);
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "setLayerType failed: " + t);
+        }
+        invertImages(root, night);
+    }
+
+    private static void invertImages(View view, boolean night) {
+        if (view instanceof ImageView) {
+            try {
+                ((ImageView) view).setColorFilter(night ? INVERT_FILTER : null);
+            } catch (Throwable ignored) {
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
-                applyForceDark(group.getChildAt(i));
+                invertImages(group.getChildAt(i), night);
             }
         }
     }
