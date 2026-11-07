@@ -22,9 +22,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Build APK
         working-directory: XianyuMeituanDark
         run: ./gradlew assembleDebug --no-daemon
